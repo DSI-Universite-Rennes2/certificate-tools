@@ -107,6 +107,7 @@ function getCertificateFromBundle () {
     local subject
     local tmpfile
 
+    # shellcheck disable=SC1083
     csplit -s -z -k -f "$TMPDIR/getItFromFilecert" "$CERTFILE" '/-----BEGIN CERTIFICATE-----/' {*}
     for file in "$TMPDIR"/getItFromFilecert*
     do
