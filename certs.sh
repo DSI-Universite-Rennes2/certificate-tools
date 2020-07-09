@@ -107,6 +107,7 @@ function getCertificateFromBundle () {
     local subject
     local tmpfile
 
+    # shellcheck disable=SC1083
     csplit -s -z -k -f "$TMPDIR/getItFromFilecert" "$CERTFILE" '/-----BEGIN CERTIFICATE-----/' {*}
     for file in "$TMPDIR"/getItFromFilecert*
     do
@@ -308,10 +309,10 @@ function update(){
         # shellcheck disable=SC2044
         for file in $(find "$WORKDIR/archive/$fqdn/" -iname "*.pem" -type f ! -iname '*-chain.pem' ! -iname '*-fullchain.pem')
         do
-            local enddate
+            local startdate
             local curtime
-            enddate=$(openssl x509 -enddate -noout -in "$file" |cut -d= -f 2)
-            curtime=$(date +%s --date="$enddate")
+            startdate=$(openssl x509 -startdate -noout -in "$file" | cut -d= -f 2)
+            curtime=$(date +%s --date="$startdate")
             if [ "$curtime" -gt "$lasttime" ]
             then
                 lastpem="$file"
