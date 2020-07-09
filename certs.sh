@@ -214,6 +214,14 @@ function getBeginYearFromCert () {
     echo "$year"
 }
 
+function getSerialFromCert () {
+    local CERTFILE="$1"
+    local serial
+
+    serial=$( openssl x509 -inform pem -noout -serial -in "$CERTFILE" | cut -d "=" -f 2 )
+    echo "$serial"
+}
+
 function install(){
     local FROMDIR
     local HELPFILE
@@ -221,9 +229,12 @@ function install(){
     local WITHOUTEXT
     local FQDN
     local YEAR
+    local SERIAL
     local KEY
     local DESTCERTDIR
     local DESTBASENAME
+    local OLDBASENAME
+    local OLDBASENAMESERIAL
     local theCertOnlyFile
 
     FROMDIR=$(realpath "$1")
@@ -241,9 +252,22 @@ function install(){
             WITHOUTEXT=${BASENAME%.pem}
             FQDN=$(getFQDNFromCert $theCertOnlyFile)
             YEAR=$(getBeginYearFromCert $theCertOnlyFile)
+            SERIAL=$(getSerialFromCert $theCertOnlyFile)
             KEY=$(find "$FROMDIR" -maxdepth 2 -iname "$WITHOUTEXT.key" 2> /dev/null | head -1)
             DESTCERTDIR="$WORKDIR/archive/$FQDN"
-            DESTBASENAME="$YEAR-$FQDN"
+            DESTBASENAME="$YEAR-$SERIAL-$FQDN"
+            OLDBASENAME="$YEAR-$FQDN"
+            if [ -e "$DESTCERTDIR/$OLDBASENAME.pem" ] 
+            then
+                logThis "detecting same old base name : $DESTCERTDIR/$OLDBASENAME.pem ; checking if it's the same" "DEBUG"
+                # Perhaps just already here, or new cert 
+                OLDBASENAMESERIAL=$(getSerialFromCert "$DESTCERTDIR/$OLDBASENAME.pem")
+                if [ "$SERIAL" == "$OLDBASENAMESERIAL" ]
+                then
+                    logThis "$oricert is already installed as $DESTCERTDIR/$OLDBASENAME.pem ; skipping !" "DEBUG"
+                    continue
+                fi
+            fi
 
             if [ -e "$KEY" ]
             then
