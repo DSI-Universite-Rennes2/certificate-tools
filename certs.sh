@@ -224,7 +224,6 @@ function install(){
     local DESTCERTDIR
     local DESTBASENAME
     local theCertOnlyFile
-    local SERIAL
 
     FROMDIR=$(realpath "$1")
     HELPFILE=$(mktemp --tmpdir="$TMPDIR" "helpfile-XXX")
@@ -244,13 +243,6 @@ function install(){
             KEY=$(find "$FROMDIR" -maxdepth 2 -iname "$WITHOUTEXT.key" 2> /dev/null | head -1)
             DESTCERTDIR="$WORKDIR/archive/$FQDN"
             DESTBASENAME="$YEAR-$FQDN"
-	    if [ -e "$DESTCERTDIR/${DESTBASENAME}.pem" ]
-	    then 
-		# Humm already have certificate for same year... probable revoked cert
-		# add serial number of the cert to the name.. unique in the same CA
-		SERIAL=$(openssl x509 -in "$DESTCERTDIR/${DESTBASENAME}.pem" -serial -noout)
-		DESTBASENAME="$YEAR-$FQDN-$SERIAL"
-	    fi
 
             if [ -e "$KEY" ]
             then
