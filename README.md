@@ -48,6 +48,15 @@ Vous pouvez ensuite atteindre pour chaque FQDN référencé en principal ou alte
 * Certificat + certificat intermédiaire : `/applis/certificate-tools/live/toto.univ-rennes2.fr/fullchain.pem`
 * Certificat intermédiaire : `/applis/certificate-tools/live/toto.univ-rennes2.fr/chain.pem`
 
+## Check Nagios
+
+Vous pouvez également monitorer vos certificats via Nagios (ou compatible) via NRPE.
+
+Installez un check NRPE. Exemple sous Debian en rajoutant dans `/etc/nagios/nrpe.d/check_certs.cfg` :
+```
+command[check_certs]=/applis/certificate-tools/certs.sh -c 90:30
+```
+
 ## Droits d'accès
 
 Si vous utilisez une application qui ne lit pas les certificats "en tant que root", pour ensuite changer d'utilisateur, rajoutez l'utilisateur au groupe ssl-cert (Debian). Sinon lancez l'outil avec l'utilisateur qui a l'usage du certificat.

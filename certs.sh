@@ -144,6 +144,22 @@ function getCertificateFromBundle () {
     rm "$TMPDIR"/getItFromFilecert*
 }
 
+function getExpireDays () {
+    local filename="$1"
+
+    local now_epoch
+    local expiry_date
+    local expiry_epoch
+    local expiry_days
+
+    now_epoch=$( date +%s )
+    expiry_date=$( openssl x509 -inform pem -noout -enddate -in "$filename" | cut -d "=" -f 2 )
+    expiry_epoch=$( date -d "$expiry_date" +%s )
+    # shellcheck disable=SC2004
+    expiry_days=$(( ($expiry_epoch - $now_epoch) / (3600 * 24) ))
+    echo "$expiry_days"
+}
+
 function isNotExpiredCertificate () {
     local filename="$1"
 
@@ -323,6 +339,16 @@ function fixRights(){
 }
 
 function update(){
+    local nagiosCheck="0"
+    if [ "$1" == "-c" ]
+    then 
+        local fqdnListOK=''
+        local fqdnListWarning=''
+        local fqdnListCritical=''
+        local warningDays=$(echo $2 | cut -f1 -d ':')
+        local criticalDays=$(echo $2 | cut -f2 -d ':')
+        nagiosCheck="1"
+    fi
     fixRights "$WORKDIR/archive"
     # shellcheck disable=SC2045
     for fqdn in $(ls "$WORKDIR"/archive/)
@@ -350,52 +376,93 @@ function update(){
             local fullchainfile
             local chainfile
             local keyfile
-            # shellcheck disable=SC2001
-            RELATIVELASTPEM=$(echo "$lastpem" | sed "s#$WORKDIR#../..#")
-            # Install latest certs into live path
-            if [ ! -d "$WORKDIR/live/$fqdn" ]
+            local expireIntoDays=$(getExpireDays "$lastpem")
+            if [ "$nagiosCheck" -eq "1" ]
             then
-                mkdir -p "$WORKDIR/live/$fqdn"
-            fi
-            rm -f "$WORKDIR/live/$fqdn"/*.pem
-            ln -s "$RELATIVELASTPEM" "$WORKDIR/live/$fqdn/cert.pem"
-            # shellcheck disable=SC2001
-            fullchainfile=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/-fullchain.pem/')
-            ln -s "$fullchainfile" "$WORKDIR/live/$fqdn/fullchain.pem"
-            # shellcheck disable=SC2001
-            chainfile=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/-chain.pem/')
-            ln -s "$chainfile" "$WORKDIR/live/$fqdn/chain.pem"
-            # shellcheck disable=SC2001
-            keyfile=$(echo "$RELATIVELASTPEM" | sed 's/pem$/key/')
-            ln -s "$keyfile" "$WORKDIR/live/$fqdn/privkey.pem"
-            logThis "Rebuild live dir with latest certificate for $fqdn" "INFO"
-
-            # Create live dir for each Subject Alternative Name of the certificate
-            for altfqdn in $(getCertificateAlternativeName "$lastpem")
-            do
-                if [ "$altfqdn" != "$fqdn" ]
+                if (( expireIntoDays > warningDays ))
                 then
-                    mkdir -p "$WORKDIR/live/$altfqdn"
-                    rm -f "$WORKDIR/live/$altfqdn"/*.pem
-                    ln -s "$RELATIVELASTPEM" "$WORKDIR/live/$altfqdn/cert.pem"
-                    ln -s "$fullchainfile" "$WORKDIR/live/$altfqdn/fullchain.pem"
-                    ln -s "$chainfile" "$WORKDIR/live/$altfqdn/chain.pem"
-                    ln -s "$keyfile" "$WORKDIR/live/$altfqdn/privkey.pem"
+                    # echo "$fqdn $expireIntoDays"
+                    fqdnListOK="$fqdn ($expireIntoDays) $fqdnListOK"
+                elif (( expireIntoDays < criticalDays ))
+                then
+                    # echo "$fqdn ($expireIntoDays) $expireIntoDays"
+                    fqdnListCritical="$fqdn ($expireIntoDays) $fqdnListCritical"
+                elif (( expireIntoDays < warningDays ))
+                then
+                    # echo "$fqdn ($expireIntoDays) $expireIntoDays"
+                    fqdnListWarning="$fqdn ($expireIntoDays) $fqdnListWarning"
+                else
+                    echo "WTF with $fqdn ($expireIntoDays)"
                 fi
-            done
+            else
+                # shellcheck disable=SC2001
+                RELATIVELASTPEM=$(echo "$lastpem" | sed "s#$WORKDIR#../..#")
+                # Install latest certs into live path
+                if [ ! -d "$WORKDIR/live/$fqdn" ]
+                then
+                    mkdir -p "$WORKDIR/live/$fqdn"
+                fi
+                rm -f "$WORKDIR/live/$fqdn"/*.pem
+                ln -s "$RELATIVELASTPEM" "$WORKDIR/live/$fqdn/cert.pem"
+                # shellcheck disable=SC2001
+                fullchainfile=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/-fullchain.pem/')
+                ln -s "$fullchainfile" "$WORKDIR/live/$fqdn/fullchain.pem"
+                # shellcheck disable=SC2001
+                chainfile=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/-chain.pem/')
+                ln -s "$chainfile" "$WORKDIR/live/$fqdn/chain.pem"
+                # shellcheck disable=SC2001
+                keyfile=$(echo "$RELATIVELASTPEM" | sed 's/pem$/key/')
+                ln -s "$keyfile" "$WORKDIR/live/$fqdn/privkey.pem"
+                logThis "Rebuild live dir with latest certificate for $fqdn" "INFO"
+
+                # Create live dir for each Subject Alternative Name of the certificate
+                for altfqdn in $(getCertificateAlternativeName "$lastpem")
+                do
+                    if [ "$altfqdn" != "$fqdn" ]
+                    then
+                        mkdir -p "$WORKDIR/live/$altfqdn"
+                        rm -f "$WORKDIR/live/$altfqdn"/*.pem
+                        ln -s "$RELATIVELASTPEM" "$WORKDIR/live/$altfqdn/cert.pem"
+                        ln -s "$fullchainfile" "$WORKDIR/live/$altfqdn/fullchain.pem"
+                        ln -s "$chainfile" "$WORKDIR/live/$altfqdn/chain.pem"
+                        ln -s "$keyfile" "$WORKDIR/live/$altfqdn/privkey.pem"
+                    fi
+                done
+            fi
         else
             logThis "No certificate found for $fqdn." "WARN"
         fi
     done
+    if [ "$nagiosCheck" -eq "1" ]
+    then
+        local exitStatus=0
+        if [ "x$fqdnListCritical" != "x" ]
+        then
+            echo -n "Critical for Certificate : $fqdnListCritical // "
+            exitStatus=2
+        fi
+        if [ "x$fqdnListWarning" != "x" ]
+        then
+            echo -n "Warning for Certificate : $fqdnListWarning // "
+            if [ $exitStatus -eq "0" ]
+            then 
+                exitStatus=1
+            fi
+        fi
+        echo "OK : $fqdnListOK"
+        exit $exitStatus
+    fi
 }
 
 function usage () {
-    echo "Usage : $0 [-i|--install <path to certs>] [-u|--update] [-h|--help]"
+    echo "Usage : $0 [-i|--install <path to certs>] [-u|--update] [-c|--check WARNING:CRITICAL] [-h|--help]"
     echo ""
     echo "  -i, --install   Install into certs archive dir with all certs from PATH/*.pem"
     echo "                  private keys are searched in "
     echo "                  PATH/<samename>.key and PATH/private/<samename>.key"
     echo "  -u, --update    Update live dir with certs stored in $LDIR/archive"
+    echo "  -c  --check     Nagios compatible check for certificate expiration"
+    echo "                  WARNING:CRITICAL are in days"
     echo "  -h, --help      display this help"
     echo ""
 }
@@ -407,7 +474,7 @@ then
 fi
 
 # https://www.bahmanm.com/2015/01/command-line-options-parse-with-getopt.html
-TEMP=$(getopt -o hi:u --long help,init:,update -n 'test.sh' -- "$@")
+TEMP=$(getopt -o hi:uc: --long help,init:,update,check: -n 'test.sh' -- "$@")
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
@@ -417,6 +484,9 @@ while true ; do
         -u|--update) 
             update
             shift ;;
+        -c|--check)
+            update "-c" "$2"
+            shift 2;;
         -h|--help)
             usage
             shift ;;
