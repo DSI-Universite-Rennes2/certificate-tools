@@ -345,8 +345,10 @@ function update(){
         local fqdnListOK=''
         local fqdnListWarning=''
         local fqdnListCritical=''
-        local warningDays=$(echo $2 | cut -f1 -d ':')
-        local criticalDays=$(echo $2 | cut -f2 -d ':')
+        local warningDays
+        local criticalDays
+        warningDays=$(echo "$2" | cut -f1 -d ':')
+        criticalDays=$(echo "$2" | cut -f2 -d ':')
         nagiosCheck="1"
     fi
     fixRights "$WORKDIR/archive"
@@ -376,7 +378,8 @@ function update(){
             local fullchainfile
             local chainfile
             local keyfile
-            local expireIntoDays=$(getExpireDays "$lastpem")
+            local expireIntoDays
+            expireIntoDays=$(getExpireDays "$lastpem")
             if [ "$nagiosCheck" -eq "1" ]
             then
                 if (( expireIntoDays > warningDays ))
