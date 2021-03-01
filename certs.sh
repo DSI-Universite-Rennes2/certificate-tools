@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 
-# Copyright (c) 2018-2020 DSI Université Rennes 2 - Yann 'Ze' Richard <yann.richard@univ-rennes2.fr>
+# Copyright (c) 2018-2021 DSI Université Rennes 2 - Yann 'Ze' Richard <yann.richard@univ-rennes2.fr>
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 # License-Filename: LICENSE 
