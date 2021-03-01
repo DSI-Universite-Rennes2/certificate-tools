@@ -1,6 +1,8 @@
 # Gestion des certificats 
 
-[![reuse compliant](https://reuse.software/badge/reuse-compliant.svg)](https://reuse.software/) [![Build Status](https://travis-ci.org/DSI-Universite-Rennes2/certificate-tools.svg?branch=master)](https://travis-ci.org/DSI-Universite-Rennes2/certificate-tools) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![reuse compliant](https://reuse.software/badge/reuse-compliant.svg)](https://reuse.software/) 
+[![Trigger: Shell Check](https://github.com/DSI-Universite-Rennes2/certificate-tools/actions/workflows/main.yml/badge.svg?event=push)](https://github.com/DSI-Universite-Rennes2/certificate-tools/actions/workflows/main.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Cet outils permet la gestion et l'organisation des certificats sur un serveur. Il vous permet en retour d'avoir un chemin fixe vers la partie la plus récente qui vous intéresse :
 * le certficat seul,
