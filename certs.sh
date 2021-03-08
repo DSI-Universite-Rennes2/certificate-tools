@@ -350,8 +350,9 @@ function update(){
         warningDays=$(echo "$2" | cut -f1 -d ':')
         criticalDays=$(echo "$2" | cut -f2 -d ':')
         nagiosCheck="1"
+    else
+        fixRights "$WORKDIR/archive"
     fi
-    fixRights "$WORKDIR/archive"
     # shellcheck disable=SC2045
     for fqdn in $(ls "$WORKDIR"/archive/)
     do
