@@ -22,6 +22,16 @@ trap 'rm -rf "$TMPDIR"' EXIT
 declare -A levels=([DEBUG]=0 [INFO]=1 [WARN]=2 [ERROR]=3)
 script_logging_level="DEBUG"
 
+# Default user/group for certs/key
+CERT_USER='root'
+CERT_GROUP='ssl-cert'
+# loading local configuration to override defaults
+if [ -e "/etc/defaults/certificate-tools" ]
+then
+    # shellcheck disable=SC1091
+    source "/etc/defaults/certificate-tools"
+fi
+
 # logThis "This will not log" "ERROR"
 # logThis "This will log" "WARN"
 # logThis "This will log" "INFO"
@@ -331,8 +341,8 @@ function fixRights(){
     CERTARCHIVEDIR="$1"
     if [[ $EUID -eq 0 ]]
     then
-        find "$CERTARCHIVEDIR" -type f -iname "*.pem" -exec chown root:ssl-cert {} \;
-        find "$CERTARCHIVEDIR" -type f -iname "*.key" -exec chown root:ssl-cert {} \;
+        find "$CERTARCHIVEDIR" -type f -iname "*.pem" -exec chown ${CERT_USER}:${CERT_GROUP} {} \;
+        find "$CERTARCHIVEDIR" -type f -iname "*.key" -exec chown ${CERT_USER}:${CERT_GROUP} {} \;
     fi
     find "$CERTARCHIVEDIR" -type f -iname "*.pem" -exec chmod 0644 {} \;
     find "$CERTARCHIVEDIR" -type f -iname "*.key" -exec chmod 0640 {} \;
