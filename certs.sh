@@ -22,19 +22,20 @@ trap 'rm -rf "$TMPDIR"' EXIT
 declare -A levels=([DEBUG]=0 [INFO]=1 [WARN]=2 [ERROR]=3)
 script_logging_level="DEBUG"
 
+CERT_CONFIG_FILE=''
 # Default user/group for certs/key
 CERT_USER='root'
 CERT_GROUP='ssl-cert'
-# loading local configuration to override defaults
-if [ -e "/etc/defaults/certificate-tools" ]
+# Loading local configuration to override defaults
+if [ -e "/etc/default/certificate-tools" ]
 then
     # shellcheck disable=SC1091
-    source "/etc/defaults/certificate-tools"
+    source "/etc/default/certificate-tools"
 fi
 
-if [ ! $(getent group "$CERT_GROUP") ]
+if ! getent group root "${CERT_GROUP}"
 then
-    # defined group does not exists
+    # group does not exists
     CERT_GROUP='root'
 fi
 
@@ -321,7 +322,17 @@ function install(){
                     # copy key
                     cp -a "$KEY" "$DESTCERTDIR/$DESTBASENAME.key"
                     logThis "Installed as $DESTCERTDIR/$DESTBASENAME.*" "INFO"
-                    
+
+                    if [ -n "$CERT_PFX_PASSWORD" ]
+                    then
+                        # Build PFX file
+                        openssl pkcs12 -export -out "${DESTCERTDIR}/${DESTBASENAME}.pfx" \
+                                    -inkey "$DESTCERTDIR/$DESTBASENAME.key" \
+                                    -in "$DESTCERTDIR/$DESTBASENAME.pem" \
+                                    -passout "pass:${CERT_PFX_PASSWORD}" \
+                                    -certfile "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
+                    fi
+
                     # print help for apache configuration
                     {
                         echo ""
@@ -350,6 +361,7 @@ function fixRights(){
         find "$CERTARCHIVEDIR" -type f -iname "*.pem" -exec chown ${CERT_USER}:${CERT_GROUP} {} \;
         find "$CERTARCHIVEDIR" -type f -iname "*.key" -exec chown ${CERT_USER}:${CERT_GROUP} {} \;
     fi
+    find "$CERTARCHIVEDIR" -type f -iname "*.pfx" -exec chmod 0644 {} \;
     find "$CERTARCHIVEDIR" -type f -iname "*.pem" -exec chmod 0644 {} \;
     find "$CERTARCHIVEDIR" -type f -iname "*.key" -exec chmod 0640 {} \;
 }
@@ -425,6 +437,14 @@ function update(){
                 rm -f "$WORKDIR/live/$fqdn"/*.pem
                 ln -s "$RELATIVELASTPEM" "$WORKDIR/live/$fqdn/cert.pem"
                 # shellcheck disable=SC2001
+                pfxfile=$(echo "$lastpem" | sed 's/.pem$/.pfx/')
+                if [ -e "$pfxfile" ]
+                then
+                    # shellcheck disable=SC2001
+                    pfxrelativefile=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/.pfx/')
+                    ln -s "$pfxrelativefile" "$WORKDIR/live/$fqdn/cert.pfx"
+                fi
+                # shellcheck disable=SC2001
                 fullchainfile=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/-fullchain.pem/')
                 ln -s "$fullchainfile" "$WORKDIR/live/$fqdn/fullchain.pem"
                 # shellcheck disable=SC2001
@@ -446,7 +466,12 @@ function update(){
                         ln -s "$fullchainfile" "$WORKDIR/live/$altfqdn/fullchain.pem"
                         ln -s "$chainfile" "$WORKDIR/live/$altfqdn/chain.pem"
                         ln -s "$keyfile" "$WORKDIR/live/$altfqdn/privkey.pem"
+                        if [ -e "$pfxfile" ]
+                        then
+                            ln -s "$pfxrelativefile" "$WORKDIR/live/$altfqdn/cert.pfx"
+                        fi
                     fi
+                    logThis "PFX : $pfxfile // $pfxrelativefile" "DEBUG"
                 done
             fi
         else
@@ -475,8 +500,9 @@ function update(){
 }
 
 function usage () {
-    echo "Usage : $0 [-i|--install <path to certs>] [-u|--update] [-c|--check WARNING:CRITICAL] [-h|--help]"
+    echo "Usage : $0 [-f|--config <configfile>] [-i|--install <path to certs>] [-u|--update] [-c|--check WARNING:CRITICAL] [-h|--help]"
     echo ""
+    echo "  -f  --config    specify a config file (default /etc/default/certificate-tools)"
     echo "  -i, --install   Install into certs archive dir with all certs from PATH/*.pem"
     echo "                  private keys are searched in "
     echo "                  PATH/<samename>.key and PATH/private/<samename>.key"
@@ -494,10 +520,21 @@ then
 fi
 
 # https://www.bahmanm.com/2015/01/command-line-options-parse-with-getopt.html
-TEMP=$(getopt -o hi:uc: --long help,init:,update,check: -n 'test.sh' -- "$@")
+TEMP=$(getopt -o f:hi:uc: --long help,install:,update,check,config: -n 'test.sh' -- "$@")
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
+        -f|--config)
+            CERT_CONFIG_FILE="$2"
+            if [ -e "$CERT_CONFIG_FILE" ]
+            then
+                # shellcheck disable=SC1090
+                source "$CERT_CONFIG_FILE"
+            else
+                echoerr "$CERT_CONFIG_FILE does not exists"
+                exit 2
+            fi
+            shift 2;;
         -i|--install)
             install "$2"
             shift 2;;

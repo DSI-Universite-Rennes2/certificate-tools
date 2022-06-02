@@ -80,6 +80,16 @@ CERT_GROUP='ssl-cert'
 
 Si le groupe ssl-cert n'existe pas, le groupe root sera utilisé.
 
+## Production d'un fichier PFX / PKCS#12
+
+Vous pouvez configurer certificate-tools pour produire un fichier au format PKCS#12
+
+Dans ce cas vous devez rajouter les variables suivantes au fichier `/etc/defaults/certificate-tools` :
+
+CERT_PFX_PASSWORD="votre mot de passe pour le fichier PFX"
+
+Le fichier PFX sera alors accessible par tout utilisateur du serveur (chmod 644)
+
 ## Résultat d'un tree
 
 ```bash
