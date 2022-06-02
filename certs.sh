@@ -32,6 +32,12 @@ then
     source "/etc/defaults/certificate-tools"
 fi
 
+if [ ! $(getent group "$CERT_GROUP") ]
+then
+    # defined group does not exists
+    CERT_GROUP='root'
+fi
+
 # logThis "This will not log" "ERROR"
 # logThis "This will log" "WARN"
 # logThis "This will log" "INFO"
