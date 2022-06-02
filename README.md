@@ -5,6 +5,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Cet outils permet la gestion et l'organisation des certificats sur un serveur. Il vous permet en retour d'avoir un chemin fixe vers la partie la plus récente qui vous intéresse :
+
 * le certficat seul,
 * le certificat avec le certificat de l'autorité intermédiaire,
 * le certificat de l'autorité intermédiaire,
@@ -12,8 +13,7 @@ Cet outils permet la gestion et l'organisation des certificats sur un serveur. I
 
 Quelque soit l'ordre des éléments dans le certificats importé l'outil se charge de le trouver et de reconstuire la chaine de certification.
 
-
-## Installation 
+## Installation
 
 ```bash
 cd /applis
@@ -26,25 +26,30 @@ cd certificate-tools
 
 ## Usage
 
-Condition pour importer vos certificats : 
+Condition pour importer vos certificats :
+
 * même base de nom pour le certificat et la clé
 * extension pem pour le certificat,
 * extension key pour la clé dans le même répertoire ou dans un sous répertoire `private/`,
 
 Exemple :
-  * `toto.pem` pour le certificat,
-  * `toto.key` pour la clé.
 
-**NOTE** : 
+* `toto.pem` pour le certificat,
+* `toto.key` pour la clé.
+
+**NOTE**
+
 * les certificats expirés ne sont pas importés.
 * n'importez pas vous même les certificats dans les répertoires archive ou live !
 
 Copiez le certificat et sa clé dans un répertoire (/tmp, votre homedir ..) puis importer les dans l'outil :
+
 ```bash
 /applis/certificate-tools/cert.sh -i /tmp
 ```
 
 Vous pouvez ensuite atteindre pour chaque FQDN référencé en principal ou alternatif dans le certificat avec un chemin fixe :
+
 * Clé privée : `/applis/certificate-tools/live/toto.univ-rennes2.fr/privkey.pem`
 * Certificat seul : `/applis/certificate-tools/live/toto.univ-rennes2.fr/cert.pem`
 * Certificat + certificat intermédiaire : `/applis/certificate-tools/live/toto.univ-rennes2.fr/fullchain.pem`
@@ -55,15 +60,27 @@ Vous pouvez ensuite atteindre pour chaque FQDN référencé en principal ou alte
 Vous pouvez également monitorer vos certificats via Nagios (ou compatible) via NRPE.
 
 Installez un check NRPE. Exemple sous Debian en rajoutant dans `/etc/nagios/nrpe.d/check_certs.cfg` :
-```
+
+```text
 command[check_certs]=/applis/certificate-tools/certs.sh -c 90:30
 ```
 
-## Droits d'accès
+## Droits d'accès aux certificats
 
-Si vous utilisez une application qui ne lit pas les certificats "en tant que root", pour ensuite changer d'utilisateur, rajoutez l'utilisateur au groupe ssl-cert (Debian). Sinon lancez l'outil avec l'utilisateur qui a l'usage du certificat.
+Si vous utilisez une application qui ne lit pas les certificats "en tant que root", pour ensuite changer d'utilisateur, rajoutez l'utilisateur au groupe `ssl-cert` (Debian). Sinon lancez l'outil avec l'utilisateur qui a l'usage du certificat.
 
-## Résultat d'un tree :
+Vous pouvez personnaliser le user/group qui sera utilisé en définissant les variables CERT_USER et CERT_GROUP dans `/etc/defaults/certificate-tools`
+
+Par défaut :
+
+```bash
+CERT_USER='root'
+CERT_GROUP='ssl-cert'
+```
+
+Si le groupe ssl-cert n'existe pas, le groupe root sera utilisé.
+
+## Résultat d'un tree
 
 ```bash
 /applis/certificate-tools
