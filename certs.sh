@@ -33,7 +33,7 @@ then
     source "/etc/default/certificate-tools"
 fi
 
-if ! getent group root "${CERT_GROUP}"
+if ! getent group root "${CERT_GROUP}" > /dev/null
 then
     # group does not exists
     CERT_GROUP='root'
@@ -255,6 +255,29 @@ function getSerialFromCert () {
     echo "$serial"
 }
 
+function buildPFX() {
+    # complete path to the certificate file in archive/
+    PRIMARY_CERT="$1"
+    FQDN="$2"
+
+    BASENAME=$(basename "$PRIMARY_CERT")
+    DESTCERTDIR="$WORKDIR/archive/$FQDN"
+    # shellcheck disable=SC2001
+    DESTBASENAME=$(echo "$BASENAME" | sed 's/.pem$//')
+
+    if [ -e "${DESTCERTDIR}/${DESTBASENAME}.pfx" ]
+    then
+        rm "${DESTCERTDIR}/${DESTBASENAME}.pfx"
+    fi
+
+    # Build PFX file
+    openssl pkcs12 -export -out "${DESTCERTDIR}/${DESTBASENAME}.pfx" \
+                -inkey "$DESTCERTDIR/$DESTBASENAME.key" \
+                -in "$DESTCERTDIR/$DESTBASENAME.pem" \
+                -passout "pass:${CERT_PFX_PASSWORD}" \
+                -certfile "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
+}
+
 function install(){
     local FROMDIR
     local HELPFILE
@@ -325,12 +348,7 @@ function install(){
 
                     if [ -n "$CERT_PFX_PASSWORD" ]
                     then
-                        # Build PFX file
-                        openssl pkcs12 -export -out "${DESTCERTDIR}/${DESTBASENAME}.pfx" \
-                                    -inkey "$DESTCERTDIR/$DESTBASENAME.key" \
-                                    -in "$DESTCERTDIR/$DESTBASENAME.pem" \
-                                    -passout "pass:${CERT_PFX_PASSWORD}" \
-                                    -certfile "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
+                        buildPFX "$DESTCERTDIR/$DESTBASENAME.pem" "$FQDN"
                     fi
 
                     # print help for apache configuration
@@ -434,7 +452,12 @@ function update(){
                 then
                     mkdir -p "$WORKDIR/live/$fqdn"
                 fi
-                rm -f "$WORKDIR/live/$fqdn"/*.pem
+                rm -f "$WORKDIR/live/$fqdn"/*.pem 
+                rm -f "$WORKDIR/live/$fqdn"/*.pfx
+                if [ -n "$BUILD_PFX" ]
+                then
+                    buildPFX "$lastpem" "$fqdn"
+                fi
                 ln -s "$RELATIVELASTPEM" "$WORKDIR/live/$fqdn/cert.pem"
                 # shellcheck disable=SC2001
                 pfxfile=$(echo "$lastpem" | sed 's/.pem$/.pfx/')
@@ -462,6 +485,7 @@ function update(){
                     then
                         mkdir -p "$WORKDIR/live/$altfqdn"
                         rm -f "$WORKDIR/live/$altfqdn"/*.pem
+                        rm -f "$WORKDIR/live/$altfqdn"/*.pfx
                         ln -s "$RELATIVELASTPEM" "$WORKDIR/live/$altfqdn/cert.pem"
                         ln -s "$fullchainfile" "$WORKDIR/live/$altfqdn/fullchain.pem"
                         ln -s "$chainfile" "$WORKDIR/live/$altfqdn/chain.pem"
@@ -471,7 +495,6 @@ function update(){
                             ln -s "$pfxrelativefile" "$WORKDIR/live/$altfqdn/cert.pfx"
                         fi
                     fi
-                    logThis "PFX : $pfxfile // $pfxrelativefile" "DEBUG"
                 done
             fi
         else
@@ -500,13 +523,14 @@ function update(){
 }
 
 function usage () {
-    echo "Usage : $0 [-f|--config <configfile>] [-i|--install <path to certs>] [-u|--update] [-c|--check WARNING:CRITICAL] [-h|--help]"
+    echo "Usage : $0 [-f|--config <configfile>] [-x|--pfx] [-i|--install <path to certs>] [-u|--update] [-c|--check WARNING:CRITICAL] [-h|--help]"
     echo ""
     echo "  -f  --config    specify a config file (default /etc/default/certificate-tools)"
     echo "  -i, --install   Install into certs archive dir with all certs from PATH/*.pem"
     echo "                  private keys are searched in "
     echo "                  PATH/<samename>.key and PATH/private/<samename>.key"
     echo "  -u, --update    Update live dir with certs stored in $LDIR/archive"
+    echo "  -x  --pfx       Create PFX/PKCS#12 files if not exists"
     echo "  -c  --check     Nagios compatible check for certificate expiration"
     echo "                  WARNING:CRITICAL are in days"
     echo "  -h, --help      display this help"
@@ -520,7 +544,7 @@ then
 fi
 
 # https://www.bahmanm.com/2015/01/command-line-options-parse-with-getopt.html
-TEMP=$(getopt -o f:hi:uc: --long help,install:,update,check,config: -n 'test.sh' -- "$@")
+TEMP=$(getopt -o xf:hi:uc: --long pfx,help,install:,update,check,config: -n 'test.sh' -- "$@")
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
@@ -539,6 +563,10 @@ while true ; do
             install "$2"
             shift 2;;
         -u|--update) 
+            update
+            shift ;;
+        -x|--pfx) 
+            BUILD_PFX="1"
             update
             shift ;;
         -c|--check)

@@ -69,7 +69,7 @@ command[check_certs]=/applis/certificate-tools/certs.sh -c 90:30
 
 Si vous utilisez une application qui ne lit pas les certificats "en tant que root", pour ensuite changer d'utilisateur, rajoutez l'utilisateur au groupe `ssl-cert` (Debian). Sinon lancez l'outil avec l'utilisateur qui a l'usage du certificat.
 
-Vous pouvez personnaliser le user/group qui sera utilisé en définissant les variables CERT_USER et CERT_GROUP dans `/etc/defaults/certificate-tools`
+Vous pouvez personnaliser le user/group qui sera utilisé en définissant les variables CERT_USER et CERT_GROUP dans `/etc/default/certificate-tools` (si root)
 
 Par défaut :
 
@@ -84,7 +84,7 @@ Si le groupe ssl-cert n'existe pas, le groupe root sera utilisé.
 
 Vous pouvez configurer certificate-tools pour produire un fichier au format PKCS#12
 
-Dans ce cas vous devez rajouter les variables suivantes au fichier `/etc/defaults/certificate-tools` :
+Dans ce cas vous devez rajouter les variables suivantes au fichier `/etc/default/certificate-tools` :
 
 CERT_PFX_PASSWORD="votre mot de passe pour le fichier PFX"
 
