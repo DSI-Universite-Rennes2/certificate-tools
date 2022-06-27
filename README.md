@@ -6,7 +6,7 @@
 
 Cet outils permet la gestion et l'organisation des certificats sur un serveur. Il vous permet en retour d'avoir un chemin fixe vers la partie la plus récente qui vous intéresse :
 
-* le certficat seul,
+* le certificat seul,
 * le certificat avec le certificat de l'autorité intermédiaire,
 * le certificat de l'autorité intermédiaire,
 * la clé privée.
