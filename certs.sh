@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2001
 # 
 # Copyright (c) 2018-2022 DSI Université Rennes 2 - Yann 'Ze' Richard <yann.richard@univ-rennes2.fr>
 #
@@ -262,7 +263,6 @@ function buildPFX() {
 
     BASENAME=$(basename "$PRIMARY_CERT")
     DESTCERTDIR="$WORKDIR/archive/$FQDN"
-    # shellcheck disable=SC2001
     DESTBASENAME=$(echo "$BASENAME" | sed 's/.pem$//')
 
     if [ -e "${DESTCERTDIR}/${DESTBASENAME}.pfx" ]
@@ -344,13 +344,15 @@ function install(){
                     cp $theCertOnlyFile "$DESTCERTDIR/$DESTBASENAME.pem"
                     # copy key
                     cp -a "$KEY" "$DESTCERTDIR/$DESTBASENAME.key"
-                    logThis "Installed as $DESTCERTDIR/$DESTBASENAME.*" "INFO"
+                    # Create bundle with key for HAProxy
+                    cat "$DESTCERTDIR/$DESTBASENAME-fullchain.pem" "$DESTCERTDIR/$DESTBASENAME.key" >  "$DESTCERTDIR/$DESTBASENAME-fullchainkey.key"
 
                     if [ -n "$CERT_PFX_PASSWORD" ]
                     then
                         buildPFX "$DESTCERTDIR/$DESTBASENAME.pem" "$FQDN"
                     fi
 
+                    logThis "Installed as $DESTCERTDIR/$DESTBASENAME.*" "INFO"
                     # print help for apache configuration
                     {
                         echo ""
@@ -445,7 +447,6 @@ function update(){
                     echo "WTF with $fqdn ($expireIntoDays)"
                 fi
             else
-                # shellcheck disable=SC2001
                 RELATIVELASTPEM=$(echo "$lastpem" | sed "s#$WORKDIR#../..#")
                 # Install latest certs into live path
                 if [ ! -d "$WORKDIR/live/$fqdn" ]
@@ -459,23 +460,32 @@ function update(){
                     buildPFX "$lastpem" "$fqdn"
                 fi
                 ln -s "$RELATIVELASTPEM" "$WORKDIR/live/$fqdn/cert.pem"
-                # shellcheck disable=SC2001
                 pfxfile=$(echo "$lastpem" | sed 's/.pem$/.pfx/')
                 if [ -e "$pfxfile" ]
                 then
-                    # shellcheck disable=SC2001
                     pfxrelativefile=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/.pfx/')
                     ln -s "$pfxrelativefile" "$WORKDIR/live/$fqdn/cert.pfx"
                 fi
-                # shellcheck disable=SC2001
                 fullchainfile=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/-fullchain.pem/')
                 ln -s "$fullchainfile" "$WORKDIR/live/$fqdn/fullchain.pem"
-                # shellcheck disable=SC2001
+
                 chainfile=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/-chain.pem/')
                 ln -s "$chainfile" "$WORKDIR/live/$fqdn/chain.pem"
-                # shellcheck disable=SC2001
+                
                 keyfile=$(echo "$RELATIVELASTPEM" | sed 's/pem$/key/')
                 ln -s "$keyfile" "$WORKDIR/live/$fqdn/privkey.pem"
+
+                bundlekey=$(echo "$lastpem" | sed 's/.pem$/-fullchainkey.key/')
+                if [ ! -e "$bundlekey" ]
+                then
+                    # not already created (installed from old version) => go create !
+                    realfullchainfile=$(echo "$lastpem" | sed 's/.pem$/-fullchain.pem/')
+                    realkeyfile=$(echo "$lastpem" | sed 's/pem$/key/')
+                    cat  "$realfullchainfile" "$realkeyfile" > "$bundlekey"
+                fi
+                relativebundlekey=$(echo "$RELATIVELASTPEM" | sed 's/.pem$/-fullchainkey.key/')
+                ln -s "$relativebundlekey"  "$WORKDIR/live/$fqdn/fullchainkey.pem"
+
                 logThis "Rebuild live dir with latest certificate for $fqdn" "INFO"
 
                 # Create live dir for each Subject Alternative Name of the certificate
@@ -490,6 +500,7 @@ function update(){
                         ln -s "$fullchainfile" "$WORKDIR/live/$altfqdn/fullchain.pem"
                         ln -s "$chainfile" "$WORKDIR/live/$altfqdn/chain.pem"
                         ln -s "$keyfile" "$WORKDIR/live/$altfqdn/privkey.pem"
+                        ln -s "$relativebundlekey" "$WORKDIR/live/$altfqdn/fullchainkey.pem"
                         if [ -e "$pfxfile" ]
                         then
                             ln -s "$pfxrelativefile" "$WORKDIR/live/$altfqdn/cert.pfx"
