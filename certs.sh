@@ -21,7 +21,7 @@ fi
 trap 'rm -rf "$TMPDIR"' EXIT
 
 declare -A levels=([DEBUG]=0 [INFO]=1 [WARN]=2 [ERROR]=3)
-script_logging_level="DEBUG"
+script_logging_level="INFO"
 
 CERT_CONFIG_FILE=''
 # Default user/group for certs/key
@@ -142,10 +142,10 @@ function getCertificateFromBundle () {
                 CERTIFICATE=$(cat "$file")
             elif [[ $HASCAFALSE =~ "CA:TRUE" ]]
             then
-                logThis "Certificat d'autorité (untrusted) : $subject" "DEBUG"
+                logThis "CA Cert (untrusted) : $subject" "DEBUG"
                 CHAIN="$CHAIN $file"
             else
-                logThis "Erreur pour $subject" "DEBUG"
+                logThis "Error for $subject" "DEBUG"
             fi
         fi
     done
@@ -156,7 +156,7 @@ function getCertificateFromBundle () {
         echo "$CERTIFICATE" > "$tmpfile"
         LAST_RETURN="$tmpfile"
     else
-        logThis "Option #2 $2 inconnue pour getItFromFile()" "ERROR"
+        logThis "Unknown Option #2 $2 for getCertificateFromBundle()" "ERROR"
         LAST_RETURN="ERROR"
     fi
     rm "$TMPDIR"/getItFromFilecert*
@@ -361,13 +361,13 @@ function install(){
                         echo "    SSLCertificateKeyFile   $WORKDIR/live/${FQDN}/privkey.pem"
                     } >> "$HELPFILE"
                 else
-                    logThis "ERROR not a valid couple of CERT/KEY : $BASENAME / $WITHOUTEXT.key" "DEBUG"
+                    logThis "ERROR not a valid couple of CERT/KEY : $BASENAME / $WITHOUTEXT.key" "ERROR"
                 fi
             else
                 logThis "No key found for $oricert, ignoring" "DEBUG"
             fi
         else
-            logThis "$oricert is expired, ignoring" "DEBUG"
+            logThis "$oricert is expired, ignoring" "WARNING"
         fi
     done
     update
