@@ -65,6 +65,19 @@ function getCertificateAlternativeName () {
     echo "$DNSLIST"
 }
 
+function isValidCaCertificate() {
+    local CERTFILE=$1
+    local res
+    if [ -e "$CERTFILE" ]
+    then
+        openssl verify -verbose "$CERTFILE" > /dev/null
+        res=$?
+        # 0 = success
+        return $res
+    fi
+    return 1
+}
+
 function getChainFromCert() {
     local CERTFILE="$1"
     local LASTCHAINFILE="$CERTFILE"
@@ -86,6 +99,12 @@ function getChainFromCert() {
         CHAINFILE=$(mktemp --tmpdir="$TMPDIR" "next-XXX")
         logThis "getting $CHAINURI into $CHAINFILE" "DEBUG"
         wget -q -O "$CHAINFILE" "$CHAINURI"
+        if [ ! -s $CHAINFILE ]
+        then 
+            logThis "Last Certificate has no URI included, probably a root CA, we stop here" "ERROR"
+            LAST_RETURN="ERROR"
+            break
+        fi
         if ! grep -q "BEGIN CERTIFICATE" "$CHAINFILE"
         then
             # DER format => convert to PEM
@@ -332,34 +351,39 @@ function install(){
                     logThis "Found : $BASENAME / $WITHOUTEXT.key" "INFO"
                     getChainFromCert "$theCertOnlyFile"
                     CHAINFILE="$LAST_RETURN"
-                    LAST_RETURN=''
-                    mkdir -p "$DESTCERTDIR"
+                    if isValidCaCertificate "$CHAINFILE"
+                    then 
+                        LAST_RETURN=''
+                        mkdir -p "$DESTCERTDIR"
 
-                    # Fullchain cert (cert must be in first place in file)
-                    cp $theCertOnlyFile "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
-                    cat "$CHAINFILE" >> "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
-                    # chain alone 
-                    cp "$CHAINFILE" "$DESTCERTDIR/$DESTBASENAME-chain.pem"
-                    # cert alone
-                    cp $theCertOnlyFile "$DESTCERTDIR/$DESTBASENAME.pem"
-                    # copy key
-                    cp -a "$KEY" "$DESTCERTDIR/$DESTBASENAME.key"
-                    # Create bundle with key for HAProxy
-                    cat "$DESTCERTDIR/$DESTBASENAME-fullchain.pem" "$DESTCERTDIR/$DESTBASENAME.key" >  "$DESTCERTDIR/$DESTBASENAME-fullchainkey.key"
+                        # Fullchain cert (cert must be in first place in file)
+                        cp $theCertOnlyFile "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
+                        cat "$CHAINFILE" >> "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
+                        # chain alone 
+                        cp "$CHAINFILE" "$DESTCERTDIR/$DESTBASENAME-chain.pem"
+                        # cert alone
+                        cp $theCertOnlyFile "$DESTCERTDIR/$DESTBASENAME.pem"
+                        # copy key
+                        cp -a "$KEY" "$DESTCERTDIR/$DESTBASENAME.key"
+                        # Create bundle with key for HAProxy
+                        cat "$DESTCERTDIR/$DESTBASENAME-fullchain.pem" "$DESTCERTDIR/$DESTBASENAME.key" >  "$DESTCERTDIR/$DESTBASENAME-fullchainkey.key"
 
-                    if [ -n "$CERT_PFX_PASSWORD" ]
-                    then
-                        buildPFX "$DESTCERTDIR/$DESTBASENAME.pem" "$FQDN"
+                        if [ -n "$CERT_PFX_PASSWORD" ]
+                        then
+                            buildPFX "$DESTCERTDIR/$DESTBASENAME.pem" "$FQDN"
+                        fi
+
+                        logThis "Installed as $DESTCERTDIR/$DESTBASENAME.*" "INFO"
+                        # print help for apache configuration
+                        {
+                            echo ""
+                            echo "    # Apache SSL Certs configuration for $FQDN"
+                            echo "    SSLCertificateFile      $WORKDIR/live/${FQDN}/fullchain.pem"
+                            echo "    SSLCertificateKeyFile   $WORKDIR/live/${FQDN}/privkey.pem"
+                        } >> "$HELPFILE"
+                    else
+                        logThis "ERROR when trying to get CA chain from cert" "ERROR"
                     fi
-
-                    logThis "Installed as $DESTCERTDIR/$DESTBASENAME.*" "INFO"
-                    # print help for apache configuration
-                    {
-                        echo ""
-                        echo "    # Apache SSL Certs configuration for $FQDN"
-                        echo "    SSLCertificateFile      $WORKDIR/live/${FQDN}/fullchain.pem"
-                        echo "    SSLCertificateKeyFile   $WORKDIR/live/${FQDN}/privkey.pem"
-                    } >> "$HELPFILE"
                 else
                     logThis "ERROR not a valid couple of CERT/KEY : $BASENAME / $WITHOUTEXT.key" "ERROR"
                 fi
