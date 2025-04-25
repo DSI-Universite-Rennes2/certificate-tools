@@ -155,7 +155,7 @@ function getCertificateFromBundle () {
             CHAIN="$CHAIN $file"
         else
             HASCAFALSE=$(openssl x509 -noout -text -in "$file" | grep -A2 "X509v3 Basic Constraints:" | grep -E "CA:FALSE|CA:TRUE")
-            if [[ $HASCAFALSE =~ "CA:FALSE" ]]
+            if [[ $HASCAFALSE =~ "CA:FALSE" ]] || [[ -z "$HASCAFALSE" ]]
             then
                 logThis "Certificat trouvé dans $(basename "$CERTFILE") : $subject" "DEBUG"
                 CERTIFICATE=$(cat "$file")
@@ -175,6 +175,7 @@ function getCertificateFromBundle () {
         echo "$CERTIFICATE" > "$tmpfile"
         LAST_RETURN="$tmpfile"
     else
+        logThis "Unknown Option #2 $2 for getCertificateFromBundle()" "ERROR"
         logThis "Unknown Option #2 $2 for getCertificateFromBundle()" "ERROR"
         LAST_RETURN="ERROR"
     fi
