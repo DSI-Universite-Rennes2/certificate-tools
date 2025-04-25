@@ -99,7 +99,7 @@ function getChainFromCert() {
         CHAINFILE=$(mktemp --tmpdir="$TMPDIR" "next-XXX")
         logThis "getting $CHAINURI into $CHAINFILE" "DEBUG"
         wget -q -O "$CHAINFILE" "$CHAINURI"
-        if [ ! -s $CHAINFILE ]
+        if [ ! -s "$CHAINFILE" ]
         then 
             logThis "Last Certificate has no URI included, probably a root CA, we stop here" "ERROR"
             LAST_RETURN="ERROR"
@@ -326,9 +326,9 @@ function install(){
         then
             BASENAME=$(basename "$oricert")
             WITHOUTEXT=${BASENAME%.pem}
-            FQDN=$(getFQDNFromCert $theCertOnlyFile)
-            YEAR=$(getBeginYearFromCert $theCertOnlyFile)
-            SERIAL=$(getSerialFromCert $theCertOnlyFile)
+            FQDN=$(getFQDNFromCert "$theCertOnlyFile")
+            YEAR=$(getBeginYearFromCert "$theCertOnlyFile")
+            SERIAL=$(getSerialFromCert "$theCertOnlyFile")
             KEY=$(find "$FROMDIR" -maxdepth 2 -iname "$WITHOUTEXT.key" 2> /dev/null | head -1)
             DESTCERTDIR="$WORKDIR/archive/$FQDN"
             DESTBASENAME="$YEAR-$SERIAL-$FQDN"
@@ -358,12 +358,12 @@ function install(){
                         mkdir -p "$DESTCERTDIR"
 
                         # Fullchain cert (cert must be in first place in file)
-                        cp $theCertOnlyFile "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
+                        cp "$theCertOnlyFile" "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
                         cat "$CHAINFILE" >> "$DESTCERTDIR/$DESTBASENAME-fullchain.pem"
                         # chain alone 
                         cp "$CHAINFILE" "$DESTCERTDIR/$DESTBASENAME-chain.pem"
                         # cert alone
-                        cp $theCertOnlyFile "$DESTCERTDIR/$DESTBASENAME.pem"
+                        cp "$theCertOnlyFile" "$DESTCERTDIR/$DESTBASENAME.pem"
                         # copy key
                         cp -a "$KEY" "$DESTCERTDIR/$DESTBASENAME.key"
                         # Create bundle with key for HAProxy
